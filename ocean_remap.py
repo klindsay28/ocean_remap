@@ -91,6 +91,7 @@ class ocean_remap_grid(object):
         Initialize ocean_remap_grid object from open SCRIP file
         """
 
+        # SCRIP dimensions are reversed relative to python, so reverse dimensions
         if lsrc_grid:
             self.dims = fptr.variables['src_grid_dims'][::-1]
         else:
@@ -145,7 +146,7 @@ class ocean_remap_grid(object):
         lat_name = dim_names['lat']
         lon_name = dim_names['lon']
 
-        # define and write common grid variables
+        # depth and depth_bnds
         if self.dims.size == 3:
             depth_name = dim_names['depth']
             varid = fptr_out.createVariable(depth_name, 'f8', (depth_name,))
@@ -159,21 +160,39 @@ class ocean_remap_grid(object):
             varid.units = 'm'
             varid[:] = self.depth_bnds
 
+        # latitude
         if self.lat.ndim == 1:
             varid = fptr_out.createVariable(lat_name, 'f8', (lat_name,))
+            varid.bounds = lat_name+'_bnds'
         else:
             varid = fptr_out.createVariable(lat_name, 'f8', (lat_name, lon_name))
         varid.long_name = 'latitude'
         varid.units = 'degrees_north'
         varid[:] = self.lat
 
+        # latitude bounds, currently only supported when latitude is 1d
+        if self.lat.ndim == 1:
+            varid = fptr_out.createVariable(lat_name+'_bnds', 'f8', (lat_name, 'd2'))
+            varid.long_name = 'latitude bounds'
+            varid.units = 'degrees_north'
+            varid[:] = _var_bnds_1d(self.lat, lextrap=True)
+
+        # longitude
         if self.lon.ndim == 1:
             varid = fptr_out.createVariable(lon_name, 'f8', (lon_name,))
+            varid.bounds = lon_name+'_bnds'
         else:
             varid = fptr_out.createVariable(lon_name, 'f8', (lat_name, lon_name))
         varid.long_name = 'longitude'
         varid.units = 'degrees_east'
         varid[:] = self.lon
+
+        # longitude bounds, currently only supported when longitude is 1d
+        if self.lon.ndim == 1:
+            varid = fptr_out.createVariable(lon_name+'_bnds', 'f8', (lon_name, 'd2'))
+            varid.long_name = 'longitude bounds'
+            varid.units = 'degrees_east'
+            varid[:] = _var_bnds_1d(self.lon, lextrap=True)
 
     def write_var_CMIP_Ofx(self, fptr_out, dim_names, var_name):
         """
@@ -222,6 +241,27 @@ class ocean_remap_grid(object):
             varid.units = 'm3'
             varid[:] = thkcello_1d[:, np.newaxis, np.newaxis] * area
             return
+
+def _var_bnds_1d(var, lextrap):
+    """
+    Compute bounds for a 1d variable.
+    Assumes bounds are midpoints of provided values.
+    Extrapolates at endpoints if lextrap==True
+    """
+    var_bnds = np.empty((var.size, 2))
+    dvar = np.diff(var)
+    if lextrap:
+        var_bnds[0, 0] = var[0] - 0.5 * dvar[0]
+    else:
+        var_bnds[0, 0] = var[0]
+    var_bnds[1:, 0] = var[:-1] + 0.5 * dvar
+    var_bnds[:-1, 1] = var_bnds[1:, 0]
+    if lextrap:
+        var_bnds[-1, 1] = var[-1] + 0.5 * dvar[-1]
+    else:
+        var_bnds[-1, 1] = var[-1]
+
+    return var_bnds
 
 def copy_time(fptr_in, fptr_out):
     """
