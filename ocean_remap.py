@@ -150,23 +150,29 @@ class ocean_remap_grid(object):
         if self.dims.size == 3:
             depth_name = dim_names['depth']
             varid = fptr_out.createVariable(depth_name, 'f8', (depth_name,))
-            varid.long_name = 'Depth'
-            varid.units = 'm'
+            varid.axis = 'Z'
             varid.bounds = depth_name+'_bnds'
+            varid.long_name = 'ocean model level'
+            varid.positive = 'down'
+            varid.standard_name = 'olevel'
+            varid.units = 'm'
             varid[:] = self.depth
 
             varid = fptr_out.createVariable(depth_name+'_bnds', 'f8', (depth_name, 'd2'))
-            varid.long_name = 'Depth Bounds'
+            varid.long_name = 'depth bounds'
             varid.units = 'm'
             varid[:] = self.depth_bnds
 
         # latitude
         if self.lat.ndim == 1:
             varid = fptr_out.createVariable(lat_name, 'f8', (lat_name,))
-            varid.bounds = lat_name+'_bnds'
         else:
             varid = fptr_out.createVariable(lat_name, 'f8', (lat_name, lon_name))
+        if self.lat.ndim == 1:
+            varid.axis = 'Y'
+            varid.bounds = lat_name+'_bnds'
         varid.long_name = 'latitude'
+        varid.standard_name = 'latitude'
         varid.units = 'degrees_north'
         varid[:] = self.lat
 
@@ -180,10 +186,13 @@ class ocean_remap_grid(object):
         # longitude
         if self.lon.ndim == 1:
             varid = fptr_out.createVariable(lon_name, 'f8', (lon_name,))
-            varid.bounds = lon_name+'_bnds'
         else:
             varid = fptr_out.createVariable(lon_name, 'f8', (lat_name, lon_name))
+        if self.lon.ndim == 1:
+            varid.axis = 'X'
+            varid.bounds = lon_name+'_bnds'
         varid.long_name = 'longitude'
+        varid.standard_name = 'longitude'
         varid.units = 'degrees_east'
         varid[:] = self.lon
 
@@ -197,6 +206,7 @@ class ocean_remap_grid(object):
     def write_var_CMIP_Ofx(self, fptr_out, dim_names, var_name):
         """
         Define and write CMIP Ofx var to an open netCDF4 file
+        Also set global attribute external_variables from cell_meassures, if appropriate
         """
 
         area = self.area.copy()
@@ -208,7 +218,9 @@ class ocean_remap_grid(object):
         if var_name == 'areacello':
             dims_out = (dim_names['lat'], dim_names['lon'])
             varid = fptr_out.createVariable(var_name, 'f8', dims_out)
+            varid.cell_methods = 'area: sum'
             varid.long_name = 'Grid-Cell Area'
+            varid.standard_name = 'cell_area'
             varid.units = 'm2'
             varid[:] = area
             return
@@ -216,12 +228,16 @@ class ocean_remap_grid(object):
         if var_name == 'deptho':
             dims_out = (dim_names['lat'], dim_names['lon'])
             varid = fptr_out.createVariable(var_name, 'f8', dims_out)
+            varid.cell_measures = 'area: areacello'
+            varid.cell_methods = 'area: mean where sea'
             varid.long_name = 'Sea Floor Depth Below Geoid'
+            varid.standard_name = 'sea_floor_depth_below_geoid'
             varid.units = 'm'
             mask3d = self.mask.view()
             mask3d.shape = tuple(self.dims)
             num_active_layers = np.count_nonzero(mask3d, axis=0)
             varid[:] = np.where(num_active_layers > 0, self.depth_bnds[num_active_layers-1, 1], 0.0)
+            fptr_out.external_variables = 'areacello'
             return
 
         thkcello_1d = self.depth_bnds[:, 1] - self.depth_bnds[:, 0]
@@ -229,17 +245,25 @@ class ocean_remap_grid(object):
         if var_name == 'thkcello':
             dims_out = (dim_names['depth'], dim_names['lat'], dim_names['lon'])
             varid = fptr_out.createVariable(var_name, 'f8', dims_out)
+            varid.cell_measures = 'area: areacello volume: volcello'
+            varid.cell_methods = 'area: mean'
             varid.long_name = 'Ocean Model Cell Thickness'
+            varid.standard_name = 'cell_thickness'
             varid.units = 'm'
             varid[:] = thkcello_1d[:, np.newaxis, np.newaxis] * np.ones(self.dims)
+            fptr_out.external_variables = 'areacello volcello'
             return
 
         if var_name == 'volcello':
             dims_out = (dim_names['depth'], dim_names['lat'], dim_names['lon'])
             varid = fptr_out.createVariable(var_name, 'f8', dims_out)
+            varid.cell_measures = 'area: areacello volume: volcello'
+            varid.cell_methods = 'area: mean'
             varid.long_name = 'Ocean Grid-Cell Volume'
+            varid.standard_name = 'ocean_volume'
             varid.units = 'm3'
             varid[:] = thkcello_1d[:, np.newaxis, np.newaxis] * area
+            fptr_out.external_variables = 'areacello volcello'
             return
 
 def _var_bnds_1d(var, lextrap):
@@ -273,7 +297,7 @@ def copy_time(fptr_in, fptr_out):
 
     varid_in = fptr_in.variables['time']
     varid_out = fptr_out.createVariable('time', 'f8', ('time'))
-    for att_name in ('long_name', 'units', 'bounds', 'calendar'):
+    for att_name in ('bounds', 'calendar', 'long_name', 'units'):
         setattr(varid_out, att_name, getattr(varid_in, att_name))
     varid_out[:] = varid_in[:]
 
@@ -324,8 +348,8 @@ def main():
     matrix_3d = ocean_remap(matrix_3d_fname)
 
     # names of coordinate dimensions in output files
-    dim_names = {'depth': 'depth', 'lat': 'lat', 'lon': 'lon'}
     dim_names = {'depth': 'olevel', 'lat': 'latitude', 'lon': 'longitude'}
+    dim_names = {'depth': 'lev', 'lat': 'lat', 'lon': 'lon'}
 
     outdir = './'
 
