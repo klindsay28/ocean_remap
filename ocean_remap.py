@@ -341,10 +341,10 @@ def main():
     example usage of ocean_remap class
     """
 
-    matrix_2d_fname = 'POP_gx1v7_to_latlon_1x1_0E_mask_conserve_20181004.nc'
+    matrix_2d_fname = 'POP_gx1v7_to_latlon_1x1_0E_mask_conserve_20181015.nc'
     matrix_2d = ocean_remap(matrix_2d_fname)
 
-    matrix_3d_fname = 'POP_gx1v7_to_latlon_1x1_0E_fulldepth_conserve_20181004.nc'
+    matrix_3d_fname = 'POP_gx1v7_to_latlon_1x1_0E_fulldepth_conserve_20181015.nc'
     matrix_3d = ocean_remap(matrix_3d_fname)
 
     # names of coordinate dimensions in output files
