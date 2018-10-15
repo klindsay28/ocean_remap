@@ -14,12 +14,20 @@ begin
   frac_thres!0 = "ncl_scalar"
 
   f_in  = addfile(fname_in, "r")
+
+  setfileoption("nc", "Format", "NetCDF4")
+  setfileoption("nc", "CompressionLevel", 1)
+
+  print("writing "+fname_out)
   system("rm -f "+fname_out)
   f_out = addfile(fname_out, "c")
 
+; cp_var_names = (/ "src_grid_dims", "dst_grid_dims", \
+;                   "xc_a", "yc_a", "xv_a", "yv_a", "mask_a", "area_a", "frac_a", \
+;                   "xc_b", "yc_b", "xv_b", "yv_b", "area_b" /)
+
   cp_var_names = (/ "src_grid_dims", "dst_grid_dims", \
-                    "xc_a", "yc_a", "xv_a", "yv_a", "mask_a", "area_a", "frac_a", \
-                    "xc_b", "yc_b", "xv_b", "yv_b", "area_b" /)
+                    "xc_b", "yc_b", "area_b" /)
 
   do var_ind = 0, dimsizes(cp_var_names)-1
     var_name = cp_var_names(var_ind)
@@ -37,7 +45,7 @@ begin
 
   frac_b(land_b_ind) = 0
   mask_b(land_b_ind) = 0
-  f_out->frac_b = frac_b
+; f_out->frac_b = frac_b
   f_out->mask_b = mask_b
 
   col = f_in->col(ocean_matrix_ind)

@@ -29,9 +29,10 @@ begin
   f_topo_in = addfile(fname_topo_in, "r")
   KMT_flat = ndtooned(f_topo_in->KMT)
 
-  fname_vert_grid_out = "temperature_annual_1deg.nc"
-  f_vert_grid_out = addfile(fname_vert_grid_out, "r")
-  depth_out = todouble(f_vert_grid_out->depth)
+  depth_out = todouble((/ \
+    0, 10, 20, 30, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500, 600, \
+    700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1750, 2000, 2500, \
+    3000, 3500, 4000, 4500, 5000, 5500 /))
   depth_out@units = "m"
   nlev_out = dimsizes(depth_out)
   ; construct depth_bnds_out as midpoints of depth, compute dz_out from depth_bnds_out
@@ -285,31 +286,38 @@ begin
 
   ; write matrix
 
+  setfileoption("nc", "Format", "NetCDF4")
+  setfileoption("nc", "CompressionLevel", 1)
+
   print("writing "+fname_out)
   system("rm -f "+fname_out)
   f_out = addfile(fname_out, "c")
 
-  filedimdef(f_out, (/ "n_a", "n_a_lateral", "n_a_depth", "n_b", "n_b_lateral", "n_b_depth", "n_s" /), \
-                    (/   n_a,        n_a_in,     nlev_in,   n_b,        n_b_in,    nlev_out,   n_s /), \
-                    (/ False,         False,       False, False,         False,       False, False /))
+; filedimdef(f_out, (/ "n_a", "n_a_lateral", "n_a_depth", "n_b", "n_b_lateral", "n_b_depth", "n_s" /), \
+;                   (/   n_a,        n_a_in,     nlev_in,   n_b,        n_b_in,    nlev_out,   n_s /), \
+;                   (/ False,         False,       False, False,         False,       False, False /))
+
+  filedimdef(f_out, (/ "n_b", "n_b_lateral", "n_b_depth", "n_s" /), \
+                    (/   n_b,        n_b_in,    nlev_out,   n_s /), \
+                    (/ False,         False,       False, False /))
 
   f_out->src_grid_dims = src_grid_dims
   f_out->dst_grid_dims = dst_grid_dims
 
-  f_out->xc_a      = xc_a
-  f_out->yc_a      = yc_a
-  f_out->area_a    = area_a
-  f_out->zc_a      = zc_a
-  f_out->zc_bnds_a = zc_bnds_a
-  f_out->frac_a    = frac_a
-  f_out->mask_a    = mask_a
+; f_out->xc_a      = xc_a
+; f_out->yc_a      = yc_a
+; f_out->area_a    = area_a
+; f_out->zc_a      = zc_a
+; f_out->zc_bnds_a = zc_bnds_a
+; f_out->frac_a    = frac_a
+; f_out->mask_a    = mask_a
 
   f_out->xc_b      = xc_b
   f_out->yc_b      = yc_b
   f_out->area_b    = area_b
   f_out->zc_b      = zc_b
   f_out->zc_bnds_b = zc_bnds_b
-  f_out->frac_b    = frac_b
+; f_out->frac_b    = frac_b
   f_out->mask_b    = mask_b
 
   f_out->row = row(0:n_s-1)
