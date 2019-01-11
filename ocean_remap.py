@@ -7,6 +7,7 @@ remap ocean output variables (2D or 3D)
 from __future__ import print_function
 import netCDF4 as nc
 import numpy as np
+import numpy.ma as ma
 from scipy.sparse import csr_matrix
 
 class ocean_remap(object):
@@ -52,27 +53,75 @@ class ocean_remap(object):
             raise TypeError('right-most dimension sizes of src_var do not match matrix')
         src_var_loc.shape = src_var.shape[0:-src_grid_ndim] + (self.src_grid.dims.prod(),)
 
+        ones_thres = 1.0e-6
+
         # perform regridding via matrix multiply (dot),
         # iterating over leading non-spatial dimensions
         # set mask_b!=1 vals to fill_value
         if src_var_loc.ndim == 1:
-            dst_var = self.matrix.dot(src_var_loc)
-            dst_var = np.where(self.dst_grid.mask == 1, dst_var, fill_value)
+            if isinstance(src_var_loc, ma.MaskedArray):
+                src_ones = np.where(src_var_loc.mask, 0.0, 1.0)
+            else:
+                src_ones = np.where(src_var_loc == fill_value, 0.0, 1.0)
+            dst_ones = self.matrix.dot(src_ones)
+            # only perform regridding with normaliztion if array of remapped 1.0's
+            # differs significantly from 1.0
+            if max(np.abs(np.where(dst_ones > ones_thres, dst_ones-1.0, 0.0))) > ones_thres:
+                dst_var = self.matrix.dot(np.where(src_ones == 1.0, src_var_loc, 0.0))
+                dst_var = np.divide(dst_var, dst_ones, where=(dst_ones > ones_thres))
+                dst_var = np.where(
+                    (self.dst_grid.mask == 1) & (dst_ones > ones_thres), dst_var, fill_value)
+            else:
+                dst_var = self.matrix.dot(src_var_loc)
+                dst_var = np.where(self.dst_grid.mask == 1, dst_var, fill_value)
         elif src_var_loc.ndim == 2:
             # handle 1 extra leading dimension (e.g., time, ensemble member)
             dst_var = np.empty((src_var_loc.shape[0], self.dst_grid.dims.prod()))
             for dim0 in range(0, src_var_loc.shape[0]):
-                dst_var[dim0, :] = self.matrix.dot(src_var_loc[dim0, :])
-                dst_var[dim0, :] = np.where(self.dst_grid.mask == 1, dst_var[dim0, :], fill_value)
+                if isinstance(src_var_loc, ma.MaskedArray):
+                    src_ones = np.where(src_var_loc[dim0, :].mask, 0.0, 1.0)
+                else:
+                    src_ones = np.where(src_var_loc[dim0, :] == fill_value, 0.0, 1.0)
+                dst_ones = self.matrix.dot(src_ones)
+                # only perform regridding with normaliztion if array of remapped 1.0's
+                # differs significantly from 1.0
+                if max(np.abs(np.where(dst_ones > ones_thres, dst_ones-1.0, 0.0))) > ones_thres:
+                    dst_var[dim0, :] = self.matrix.dot(
+                        np.where(src_ones == 1.0, src_var_loc[dim0, :], 0.0))
+                    dst_var[dim0, :] = np.divide(
+                        dst_var[dim0, :], dst_ones, where=(dst_ones > ones_thres))
+                    dst_var[dim0, :] = np.where(
+                        (self.dst_grid.mask == 1) & (dst_ones > ones_thres), dst_var[dim0, :],
+                        fill_value)
+                else:
+                    dst_var[dim0, :] = self.matrix.dot(src_var_loc[dim0, :])
+                    dst_var[dim0, :] = np.where(
+                        self.dst_grid.mask == 1, dst_var[dim0, :], fill_value)
         elif src_var_loc.ndim == 3:
             # handle 2 extra leading dimensions (e.g., time, ensemble member)
             dst_var = np.empty((src_var_loc.shape[0], src_var_loc.shape[1],
                                 self.dst_grid.dims.prod()))
             for dim0 in range(0, src_var_loc.shape[0]):
                 for dim1 in range(0, src_var_loc.shape[1]):
-                    dst_var[dim0, dim1, :] = self.matrix.dot(src_var_loc[dim0, dim1, :])
-                    dst_var[dim0, dim1, :] = np.where(self.dst_grid.mask == 1,
-                                                      dst_var[dim0, dim1, :], fill_value)
+                    if isinstance(src_var_loc, ma.MaskedArray):
+                        src_ones = np.where(src_var_loc[dim0, dim1, :].mask, 0.0, 1.0)
+                    else:
+                        src_ones = np.where(src_var_loc[dim0, dim1, :] == fill_value, 0.0, 1.0)
+                    dst_ones = self.matrix.dot(src_ones)
+                    # only perform regridding with normaliztion if array of remapped 1.0's
+                    # differs significantly from 1.0
+                    if max(np.abs(np.where(dst_ones > ones_thres, dst_ones-1.0, 0.0))) > ones_thres:
+                        dst_var[dim0, dim1, :] = self.matrix.dot(
+                            np.where(src_ones == 1.0, src_var_loc[dim0, dim1, :], 0.0))
+                        dst_var[dim0, dim1, :] = np.divide(
+                            dst_var[dim0, dim1, :], dst_ones, where=(dst_ones > ones_thres))
+                        dst_var[dim0, dim1, :] = np.where(
+                            (self.dst_grid.mask == 1) & (dst_ones > ones_thres),
+                            dst_var[dim0, dim1, :], fill_value)
+                    else:
+                        dst_var[dim0, dim1, :] = self.matrix.dot(src_var_loc[dim0, dim1, :])
+                        dst_var[dim0, dim1, :] = np.where(
+                            self.dst_grid.mask == 1, dst_var[dim0, dim1, :], fill_value)
         else:
             raise TypeError('too many extra dimensions in src_var')
 
@@ -363,7 +412,8 @@ def main():
 
     testfile_in_fname = 'infile.nc'
     testfile_out_fname = outdir+'outfile.nc'
-    field_names = ('HT', 'REGION_MASK', 'SSH', 'SHF', 'SALT')
+    field_names = ('HT', 'REGION_MASK', 'SSH', 'SHF', 'POC_FLUX_100m', 'SALT')
+    # field_names = ('HT', 'REGION_MASK')
 
     fptr_in = nc.Dataset(testfile_in_fname, 'r') # pylint: disable=E1101
     fptr_out = nc.Dataset(testfile_out_fname, 'w') # pylint: disable=E1101
