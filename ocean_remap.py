@@ -60,7 +60,7 @@ class ocean_remap(object):
         # set mask_b!=1 vals to fill_value
         if src_var_loc.ndim == 1:
             if isinstance(src_var_loc, ma.MaskedArray):
-                src_ones = np.where(src_var_loc.mask, 0.0, 1.0)
+                src_ones = np.where(ma.getmaskarray(src_var_loc), 0.0, 1.0)
             else:
                 src_ones = np.where(src_var_loc == fill_value, 0.0, 1.0)
             dst_ones = self.matrix.dot(src_ones)
@@ -79,7 +79,7 @@ class ocean_remap(object):
             dst_var = np.empty((src_var_loc.shape[0], self.dst_grid.dims.prod()))
             for dim0 in range(0, src_var_loc.shape[0]):
                 if isinstance(src_var_loc, ma.MaskedArray):
-                    src_ones = np.where(src_var_loc[dim0, :].mask, 0.0, 1.0)
+                    src_ones = np.where(ma.getmaskarray(src_var_loc[dim0, :]), 0.0, 1.0)
                 else:
                     src_ones = np.where(src_var_loc[dim0, :] == fill_value, 0.0, 1.0)
                 dst_ones = self.matrix.dot(src_ones)
@@ -104,7 +104,7 @@ class ocean_remap(object):
             for dim0 in range(0, src_var_loc.shape[0]):
                 for dim1 in range(0, src_var_loc.shape[1]):
                     if isinstance(src_var_loc, ma.MaskedArray):
-                        src_ones = np.where(src_var_loc[dim0, dim1, :].mask, 0.0, 1.0)
+                        src_ones = np.where(ma.getmaskarray(src_var_loc[dim0, dim1, :]), 0.0, 1.0)
                     else:
                         src_ones = np.where(src_var_loc[dim0, dim1, :] == fill_value, 0.0, 1.0)
                     dst_ones = self.matrix.dot(src_ones)
