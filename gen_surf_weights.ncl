@@ -10,7 +10,10 @@ begin
   fname_in  = "../weights_files/POP_gx1v7_to_latlon_1x1_0E_conserve_20180914.nc"
   fname_out = "POP_gx1v7_to_latlon_1x1_0E_mask_conserve_"+datestr+".nc"
 
-  frac_thres = 0.525
+  fname_in  = "../weights_files/POP_tx0.1v2_to_latlon_0.25x0.25_0E_conserve_20190917.nc"
+  fname_out = "POP_tx0.1v2_to_latlon_0.25x0.25_0E_mask_conserve_"+datestr+".nc"
+
+  frac_thres = 0.521
   frac_thres!0 = "ncl_scalar"
 
   f_in  = addfile(fname_in, "r")
@@ -59,4 +62,8 @@ begin
   copy_VarAtts(f_in, f_out)
   f_out@history = "matrix entries corresponding to frac_b .le. frac_thres removed, "+datestr
   f_out->frac_thres = frac_thres
+
+  print("frac_thres = "+frac_thres)
+  print("area_a = "+sum(f_in->mask_a*f_in->area_a))
+  print("area_b = "+sum(mask_b*f_in->area_b))
 end

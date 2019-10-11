@@ -183,7 +183,7 @@ class ocean_remap_grid(object):
         dims_dict = {}
         if self.dims.size == 3:
             dims_dict[dim_names['depth']] = self.dims[0]
-            dims_dict['d2'] = 2
+        dims_dict['d2'] = 2
         dims_dict[dim_names['lat']] = self.dims[-2]
         dims_dict[dim_names['lon']] = self.dims[-1]
 
