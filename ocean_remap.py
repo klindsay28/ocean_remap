@@ -429,6 +429,7 @@ def main():
     # field_names = ('HT', 'REGION_MASK')
 
     fptr_in = nc.Dataset(testfile_in_fname, 'r') # pylint: disable=E1101
+    fptr_in.set_auto_scale(False)
     fptr_out = nc.Dataset(testfile_out_fname, 'w') # pylint: disable=E1101
 
     copy_time(fptr_in, fptr_out)
@@ -443,6 +444,7 @@ def main():
         print(field_name)
 
         varid_out = def_var(field_name, fptr_in, fptr_out, dim_names_partial, dim_names_full)
+        varid_out.set_auto_scale(False)
 
         # use appropriate matrix for regridding
         if dim_names_full['depth'] in varid_out.dimensions:
